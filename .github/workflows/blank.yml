@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexStream - Premium Live TV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #131a26;
+            --accent-color: #3b82f6;
+            --gradient-accent: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding-bottom: 40px; }
+
+        header {
+            background: rgba(19, 26, 38, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 700;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .player-container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
+        
+        .video-wrapper {
+            position: relative;
+            padding-top: 56.25%;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+        }
+
+        .now-playing { margin-top: 15px; display: flex; align-items: center; justify-content: space-between; }
+        .now-playing h2 { font-size: 18px; font-weight: 600; color: #3b82f6; }
+        .live-badge { background: #ef4444; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; animation: blink 1.5s infinite; }
+
+        .controls-section { max-width: 1000px; margin: 25px auto; padding: 0 15px; display: flex; flex-direction: column; gap: 15px; }
+        .search-box { position: relative; width: 100%; }
+        .search-box input {
+            width: 100%; padding: 14px 20px; padding-left: 45px; background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; color: white; font-size: 15px; outline: none;
+        }
+        .search-box i { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+
+        .filter-tabs { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .tab { padding: 8px 18px; background: var(--card-bg); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 30px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+        .tab.active { background: var(--gradient-accent); color: white; }
+
+        .grid-container { max-width: 1000px; margin: 0 auto; padding: 0 15px; }
+        .channel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; }
+        
+        .channel-card {
+            background: var(--card-bg); border: 1px solid rgba(255, 255, 255, 0.03); border-radius: 14px;
+            padding: 20px 15px; text-align: center; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; align-items: center; gap: 12px;
+        }
+        .channel-card:hover { transform: translateY(-5px); border-color: rgba(59, 130, 246, 0.3); }
+        .channel-icon { width: 60px; height: 60px; background: rgba(255,255,255,0.03); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+        .channel-name { font-size: 14px; font-weight: 600; }
+        .channel-country { font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 10px; }
+
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @media(max-width: 600px) { .channel-grid { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo"><i class="fa-solid fa-play"></i> NexStream</div>
+    </header>
+
+    <div class="player-container">
+        <div class="video-wrapper">
+            <video id="videoPlayer" controls autoplay playsinline></video>
+        </div>
+        <div class="now-playing">
+            <h2 id="currentChannelName">Select a Channel</h2>
+            <span class="live-badge" id="liveBadge" style="display:none;">LIVE</span>
+        </div>
+    </div>
+
+    <div class="controls-section">
+        <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="searchBar" placeholder="Search channels..." onkeyup="filterChannels()">
+        </div>
+        <div class="filter-tabs">
+            <div class="tab active" onclick="filterCategory('all', this)">All</div>
+            <div class="tab" onclick="filterCategory('news', this)">News & Info</div>
+            <div class="tab" onclick="filterCategory('ent', this)">Entertainment & Sports</div>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        <div class="channel-grid" id="channelGrid"></div>
+    </div>
+
+    <script>
+        // এই লিংকগুলো সম্পূর্ণ CORS-Free, তাই আপনার এডিটরের ভেতরেও চাকা না ঘুরে সাথে সাথে চলবে
+                const channels = [
+            // TRT Channels
+            { name: "TRT World", category: "news", country: "Global", icon: "🌍", url: "https://tv-trtworld.medya.trt.com.tr/master.m3u8" },
+            { name: "TRT Haber", category: "news", country: "Turkey", icon: "📰", url: "https://tv-trthaber.medya.trt.com.tr/master.m3u8" },
+            { name: "TRT Spor", category: "ent", country: "Sports", icon: "⚽", url: "https://tv-trtspor.medya.trt.com.tr/master.m3u8" },
+            { name: "TRT 1", category: "ent", country: "Turkey", icon: "🎬", url: "https://tv-trt1.medya.trt.com.tr/master.m3u8" },
+            
+            // New Global Channels (নতুন যোগ করা হলো)
+            { name: "Al Jazeera English", category: "news", country: "Qatar", icon: "🇶🇦", url: "https://live-ams.aljazeera.net/aje/index.m3u8" },
+            { name: "DW News", category: "news", country: "Germany", icon: "🇩🇪", url: "https://dwamdstream102.akamaized.net/hls/live/2015532/dwamdstream102/index.m3u8" },
+            { name: "France 24 English", category: "news", country: "France", icon: "🇫🇷", url: "https://static.france24.com/live/F24_EN_LO_HLS/live_tv.m3u8" },
+            { name: "Sky News", category: "news", country: "UK", icon: "🇬🇧", url: "https://skynews-skynewsmain-invsat.amagi.tv/playlist.m3u8" },
+            { name: "NASA TV", category: "ent", country: "USA", icon: "🚀", url: "https://ntvabc.akamaized.net/hls/live/2017931/NASA-TV-ABC/master.m3u8" },
+            { name: "Bloomberg TV", category: "news", country: "USA", icon: "📈", url: "https://live-bloomberg-v4-us-west.akamaized.net/HLS/live/2135676/top/master.m3u8" }
+        ];
+
+
+        const videoPlayer = document.getElementById('videoPlayer');
+        let currentHls = null;
+        let activeCategory = 'all';
+
+        function loadChannels(channelsToRender) {
+            const grid = document.getElementById('channelGrid');
+            grid.innerHTML = '';
+            channelsToRender.forEach(channel => {
+                const card = document.createElement('div');
+                card.className = 'channel-card';
+                card.onclick = () => playChannel(channel);
+                card.innerHTML = `
+                    <div class="channel-icon">${channel.icon}</div>
+                    <div class="channel-name">${channel.name}</div>
+                    <div class="channel-country">${channel.country}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function playChannel(channel) {
+            document.getElementById('currentChannelName').innerText = "চলছে: " + channel.name;
+            document.getElementById('liveBadge').style.display = 'inline-block';
+
+            if (currentHls) { 
+                currentHls.destroy(); 
+            }
+
+            if (Hls.isSupported()) {
+                currentHls = new Hls();
+                currentHls.loadSource(channel.url);
+                currentHls.attachMedia(videoPlayer);
+                currentHls.on(Hls.Events.MANIFEST_PARSED, () => videoPlayer.play());
+            } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                videoPlayer.src = channel.url;
+                videoPlayer.addEventListener('loadedmetadata', () => videoPlayer.play());
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function filterCategory(category, element) {
+            activeCategory = category;
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            element.classList.add('active');
+            filterChannels();
+        }
+
+        function filterChannels() {
+            const searchText = document.getElementById('searchBar').value.toLowerCase();
+            const filtered = channels.filter(channel => {
+                const matchesSearch = channel.name.toLowerCase().includes(searchText);
+                const matchesCategory = (activeCategory === 'all' || channel.category === activeCategory);
+                return matchesSearch && matchesCategory;
+            });
+            loadChannels(filtered);
+        }
+
+        window.onload = () => {
+            loadChannels(channels);
+            if(channels.length > 0) playChannel(channels[0]);
+        };
+    </script>
+</body>
+</html>
